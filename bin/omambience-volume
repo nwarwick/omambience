@@ -1,0 +1,54 @@
+#!/bin/bash
+# Set or adjust the volume of an ambient sound.
+#   omambience-volume rain 50      # set to 50
+#   omambience-volume rain +10     # raise by 10
+#   omambience-volume rain -5      # lower by 5
+# Volume is clamped to [0, 130]. mpv permits >100 via soft amplification, but
+# 130 is plenty — going higher distorts.
+# The new value is persisted, so the next start of this sound uses it too.
+
+set -euo pipefail
+
+sound="${1:-}"
+delta="${2:-}"
+if [[ -z "$sound" || -z "$delta" ]]; then
+  echo "Usage: $0 <sound> <value|+N|-N>" >&2
+  exit 1
+fi
+
+if ! [[ "$delta" =~ ^[+-]?[0-9]+$ ]]; then
+  echo "Volume must be an integer or +/-integer, got: $delta" >&2
+  exit 1
+fi
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omambience"
+SOCK="$STATE_DIR/$sound.sock"
+VOL_FILE="$STATE_DIR/$sound.volume"
+
+mkdir -p "$STATE_DIR"
+
+current=100
+if [[ -f "$VOL_FILE" ]]; then
+  tmp=$(<"$VOL_FILE")
+  [[ "$tmp" =~ ^[0-9]+$ ]] && current=$tmp
+fi
+
+case "$delta" in
+  +*) target=$(( current + ${delta#+} )) ;;
+  -*) target=$(( current - ${delta#-} )) ;;
+  *)  target=$delta ;;
+esac
+
+if (( target < 0 ));   then target=0;   fi
+if (( target > 130 )); then target=130; fi
+
+echo "$target" > "$VOL_FILE"
+
+# Push live if currently playing — otherwise the persisted value will be
+# picked up next time the sound starts.
+if [[ -S "$SOCK" ]]; then
+  printf '{"command":["set_property","volume",%d]}\n' "$target" \
+    | socat - "UNIX-CONNECT:$SOCK" >/dev/null 2>&1 || true
+fi
+
+echo "$target"

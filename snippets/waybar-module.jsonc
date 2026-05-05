@@ -1,0 +1,9 @@
+// Add "custom/omambience" to one of your modules arrays (modules-left/center/right),
+// then paste the block below into the top-level object of ~/.config/waybar/config.jsonc.
+
+"custom/omambience": {
+  "exec": "$HOME/.local/bin/omambience-status",
+  "return-type": "json",
+  "format": "{}",
+  "on-click": "$HOME/.local/bin/omambience-stop-all"
+}

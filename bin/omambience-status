@@ -1,0 +1,85 @@
+#!/bin/bash
+# Long-running Waybar producer. Emits one JSON line per second describing
+# every available sound (discovered from audio files on disk).
+#
+#   text:    single icon (♪), with active count appended when 2+ play
+#   class:   "idle" when nothing playing, "active" otherwise — style with CSS
+#   tooltip: per-sound on/off mark + 10-cell volume bar + percent
+#
+# Volume changes (via omambience-volume) are reflected within ~1s.
+#
+# Note: deliberately no `set -e` — a transient glob/read error shouldn't
+# kill the Waybar producer.
+
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/omambience"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omambience"
+AUDIO_DIR="$DATA_DIR/audio"
+
+is_playing() {
+  pgrep -f -- "--input-ipc-server=$STATE_DIR/$1.sock" >/dev/null 2>&1
+}
+
+get_volume() {
+  local vf="$STATE_DIR/$1.volume" v=100 tmp
+  if [[ -f "$vf" ]]; then
+    tmp=$(<"$vf")
+    [[ "$tmp" =~ ^[0-9]+$ ]] && v=$tmp
+  fi
+  echo "$v"
+}
+
+# Draw a 10-cell bar from a 0-130 volume (clamps the bar at 100; numeric
+# percent is shown unclamped).
+volume_bar() {
+  local v=$1 i filled bar=""
+  (( v > 100 )) && v=100
+  filled=$(( v / 10 ))
+  for ((i=0; i<filled; i++)); do bar+="▓"; done
+  for ((i=filled; i<10; i++)); do bar+="░"; done
+  printf '%s' "$bar"
+}
+
+while true; do
+  shopt -s nullglob
+  files=("$AUDIO_DIR"/*.ogg)
+  shopt -u nullglob
+
+  if (( ${#files[@]} == 0 )); then
+    printf '{"text":"♪","class":"idle","tooltip":"No sounds installed"}\n'
+    sleep 1
+    continue
+  fi
+
+  # Sort sound names alphabetically so the tooltip order is stable.
+  mapfile -t names < <(
+    for f in "${files[@]}"; do basename "$f" .ogg; done | sort
+  )
+
+  active=0
+  tooltip=""
+  for sound in "${names[@]}"; do
+    vol=$(get_volume "$sound")
+    bar=$(volume_bar "$vol")
+    if is_playing "$sound"; then
+      ((active++))
+      mark="●"
+    else
+      mark="○"
+    fi
+    tooltip+="$(printf '%s %-8s %s %3d%%' "$mark" "$sound" "$bar" "$vol")\\n"
+  done
+  tooltip="${tooltip%\\n}"
+
+  # Plain Unicode music note (U+266B). Renders without a Nerd Font.
+  icon=$'♫'
+  if (( active == 0 )); then
+    text="$icon"; class="idle"
+  elif (( active == 1 )); then
+    text="$icon"; class="active"
+  else
+    text="$icon $active"; class="active"
+  fi
+
+  printf '{"text":"%s","class":"%s","tooltip":"%s"}\n' "$text" "$class" "$tooltip"
+  sleep 1
+done

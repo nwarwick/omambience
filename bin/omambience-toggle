@@ -1,0 +1,58 @@
+#!/bin/bash
+# Toggle one ambient sound on or off.
+#   omambience-toggle rain
+# If the sound is playing, kills its mpv. Otherwise starts a new looped mpv
+# instance. Multiple sounds can play at once — that's the mixing model; mixing
+# itself happens at the PipeWire layer.
+
+set -euo pipefail
+
+sound="${1:-}"
+if [[ -z "$sound" ]]; then
+  echo "Usage: $0 <sound>" >&2
+  exit 1
+fi
+
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/omambience"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omambience"
+AUDIO_FILE="$DATA_DIR/audio/$sound.ogg"
+SOCK="$STATE_DIR/$sound.sock"
+VOL_FILE="$STATE_DIR/$sound.volume"
+
+if [[ ! -f "$AUDIO_FILE" ]]; then
+  echo "No audio file at $AUDIO_FILE" >&2
+  exit 1
+fi
+
+mkdir -p "$STATE_DIR"
+
+# Pattern match against mpv's own argv. The leading `--` keeps us from
+# accidentally matching unrelated processes that happen to mention the socket
+# path (e.g. an interactive shell that just `cat`-ed the socket file).
+PATTERN="--input-ipc-server=$SOCK"
+
+# If already playing, stop it and we're done.
+# `--` keeps pgrep/pkill from interpreting the leading -- in the pattern as
+# their own option flag.
+if pgrep -f -- "$PATTERN" >/dev/null 2>&1; then
+  pkill -f -- "$PATTERN" 2>/dev/null || true
+  rm -f "$SOCK"
+  exit 0
+fi
+
+# Stale socket left from a crashed mpv would block a fresh bind.
+rm -f "$SOCK"
+
+# Restore last-set volume; default 100 on first run.
+vol=100
+if [[ -f "$VOL_FILE" ]]; then
+  tmp=$(<"$VOL_FILE")
+  [[ "$tmp" =~ ^[0-9]+$ ]] && vol=$tmp
+fi
+
+setsid -f mpv \
+  --no-config --no-video --no-terminal \
+  --loop \
+  --volume="$vol" \
+  --input-ipc-server="$SOCK" \
+  "$AUDIO_FILE" >/dev/null 2>&1

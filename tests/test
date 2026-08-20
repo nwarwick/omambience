@@ -7,8 +7,6 @@ repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 bash -n \
   "$repo_dir"/bin/omambience-* \
   "$repo_dir/lib/omambience.sh" \
-  "$repo_dir/install-omarchy" \
-  "$repo_dir/uninstall-omarchy" \
   "$repo_dir/tests/test-cli"
 
 jq -e '
@@ -28,7 +26,8 @@ grep -Fq 'tooltipText: ""' "$repo_dir/BarWidget.qml"
 grep -Fq 'useActiveColor: false' "$repo_dir/BarWidget.qml"
 grep -Fq 'Math.round(volumeSlider.liveValue) + "%"' "$repo_dir/Panel.qml"
 grep -Fq 'readonly property int maximumVolume: 100' "$repo_dir/BarWidget.qml"
-grep -Fq 'Left-click its bar widget to open the mixer' "$repo_dir/install-omarchy"
+grep -Fq 'omarchy plugin add https://github.com/nwarwick/omambience.git --enable' "$repo_dir/README.md"
+grep -Fq 'omarchy plugin remove nwarwick.omambience' "$repo_dir/README.md"
 if command -v luac >/dev/null 2>&1; then
   luac -p "$repo_dir/snippets/hypr-omambience.lua"
 fi

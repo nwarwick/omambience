@@ -10,6 +10,8 @@ native Omarchy shell bar widget backed by small Bash commands and one looping
 - Stop the whole mix with one click.
 - Control everything from Quattro's Lua keybindings through shell IPC.
 
+![Omambience mixer panel showing six ambient sounds](preview.png)
+
 Omambience targets Omarchy 4.x only. Waybar and pre-Quattro Hyprland config
 are intentionally unsupported.
 
@@ -25,16 +27,6 @@ The widget is placed in the right bar section by default. Drag it elsewhere or
 use `omarchy bar move nwarwick.omambience`.
 
 Quattro includes Omambience's runtime dependencies (`mpv`, `socat`, and `jq`).
-On a customized installation, clone the repository and run the installer to
-ask Omarchy's package helper for anything missing before adding the plugin:
-
-```sh
-git clone https://github.com/nwarwick/omambience.git
-cd omambience
-./install-omarchy
-```
-
-The plugin manager deliberately installs no hooks and never asks for sudo.
 Review third-party plugin code before enabling it.
 
 ## Bar widget
@@ -146,14 +138,6 @@ commands. PipeWire mixes the resulting streams.
 
 ## Uninstall
 
-From a repository checkout:
-
-```sh
-./uninstall-omarchy
-```
-
-Or manually:
-
 ```sh
 omarchy-shell nwarwick.omambience stopAll
 omarchy plugin remove nwarwick.omambience
@@ -169,12 +153,6 @@ optional hotkeys.
 ```sh
 ./tests/test
 omarchy plugin validate .
-```
-
-To install from a local committed checkout rather than its Git remote:
-
-```sh
-OMAMBIENCE_PLUGIN_SOURCE="$PWD" ./install-omarchy
 ```
 
 ## License

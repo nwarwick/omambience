@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "nwarwick.omambience",
+  "name": "Omambience",
+  "version": "2.0.0",
+  "author": "Nicholas Warwick",
+  "license": "MIT",
+  "description": "Mix looping ambient sounds from the Omarchy bar",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Omambience",
+    "description": "Ambient sound mixer status and controls",
+    "category": "Audio",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "alwaysShow": true
+    },
+    "schema": [
+      {
+        "key": "alwaysShow",
+        "type": "boolean",
+        "label": "Always show",
+        "description": "Keep the widget visible when no sounds are playing.",
+        "defaultValue": true
+      }
+    ]
+  }
+}

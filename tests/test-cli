@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+test_dir="$(mktemp -d)"
+fake_bin="$test_dir/bin"
+mkdir -p "$fake_bin" "$test_dir/data/omambience/audio" "$test_dir/state"
+
+cleanup() {
+  XDG_STATE_HOME="$test_dir/state" OMAMBIENCE_ROOT="$repo_dir" \
+    "$repo_dir/bin/omambience-stop-all" >/dev/null 2>&1 || true
+  rm -rf -- "$test_dir"
+}
+trap cleanup EXIT
+
+cat >"$fake_bin/mpv" <<'FAKE_MPV'
+#!/usr/bin/env bash
+trap 'exit 0' TERM INT
+while :; do
+  sleep 60 &
+  wait "$!"
+done
+FAKE_MPV
+chmod +x "$fake_bin/mpv"
+
+export PATH="$fake_bin:/usr/bin"
+export XDG_DATA_HOME="$test_dir/data"
+export XDG_STATE_HOME="$test_dir/state"
+export OMAMBIENCE_ROOT="$repo_dir"
+
+toggle="$repo_dir/bin/omambience-toggle"
+volume="$repo_dir/bin/omambience-volume"
+status="$repo_dir/bin/omambience-status"
+stop_all="$repo_dir/bin/omambience-stop-all"
+
+fail() {
+  printf 'not ok - %s\n' "$*" >&2
+  exit 1
+}
+
+assert_json() {
+  local filter="$1"
+  local message="$2"
+  "$status" | jq -e "$filter" >/dev/null || fail "$message"
+}
+
+assert_json '.available == 6 and .active == 0
+  and any(.sounds[]; .name == "cafe")
+  and any(.sounds[]; .name == "stream")
+  and any(.sounds[]; .name == "thunder")
+  and any(.sounds[]; .name == "waves")
+  and (has("class") | not)' \
+  "bundled sounds should be discovered without legacy Waybar fields"
+
+"$toggle" cafe
+cafe_pid="$(<"$XDG_STATE_HOME/omambience/cafe.pid")"
+tr '\0' '\n' <"/proc/$cafe_pid/cmdline" \
+  | grep -Fx -- '--volume-gain=19.3' >/dev/null \
+  || fail "bundled sounds should use their loudness calibration"
+"$toggle" cafe
+
+touch "$XDG_DATA_HOME/omambience/audio/cafe.ogg"
+"$toggle" cafe
+cafe_pid="$(<"$XDG_STATE_HOME/omambience/cafe.pid")"
+tr '\0' '\n' <"/proc/$cafe_pid/cmdline" \
+  | grep -Fx -- '--volume-gain=0' >/dev/null \
+  || fail "user overrides should retain their source level"
+"$toggle" cafe
+rm -- "$XDG_DATA_HOME/omambience/audio/cafe.ogg"
+
+"$toggle" rain
+assert_json '.active == 1 and any(.sounds[]; .name == "rain" and .playing)' \
+  "rain should start"
+"$toggle" rain
+assert_json '.active == 0' "a second toggle should stop rain"
+
+"$toggle" rain & first_toggle=$!
+"$toggle" rain & second_toggle=$!
+wait "$first_toggle" "$second_toggle"
+assert_json '.active == 0' "concurrent toggles should be serialized"
+
+printf '125\n' >"$XDG_STATE_HOME/omambience/rain.volume"
+assert_json 'any(.sounds[]; .name == "rain" and .volume == 100)' \
+  "legacy saved volumes should clamp at 100"
+[[ $("$volume" rain 95) == 95 ]] || fail "absolute volume should be stored"
+[[ $("$volume" rain +10) == 100 ]] || fail "volume should clamp at 100"
+[[ $("$volume" rain -200) == 0 ]] || fail "volume should clamp at zero"
+[[ $("$volume" rain 08) == 8 ]] || fail "leading zeros should be parsed as decimal"
+
+"$volume" rain 0 >/dev/null
+pids=()
+for _ in {1..10}; do
+  "$volume" rain +1 >/dev/null &
+  pids+=("$!")
+done
+for pid in "${pids[@]}"; do wait "$pid"; done
+[[ $(<"$XDG_STATE_HOME/omambience/rain.volume") == 10 ]] \
+  || fail "concurrent volume changes should be serialized"
+
+if "$toggle" '../escape' >/dev/null 2>&1; then
+  fail "unsafe sound names should be rejected"
+fi
+if "$toggle" missing >/dev/null 2>&1; then
+  fail "missing sounds should be rejected"
+fi
+
+touch "$XDG_DATA_HOME/omambience/audio/wind.ogg"
+assert_json '.available == 7 and any(.sounds[]; .name == "wind")' \
+  "user sounds should be discovered"
+"$toggle" wind
+wind_pid="$(<"$XDG_STATE_HOME/omambience/wind.pid")"
+tr '\0' '\n' <"/proc/$wind_pid/cmdline" \
+  | grep -Fx "$XDG_DATA_HOME/omambience/audio/wind.ogg" >/dev/null \
+  || fail "user audio should be preferred"
+
+"$toggle" fire
+assert_json '.active == 2' "sounds should mix"
+"$stop_all"
+assert_json '.active == 0' "stop-all should stop every sound"
+
+printf 'ok - cli behavior\n'

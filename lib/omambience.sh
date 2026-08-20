@@ -69,6 +69,7 @@ omambience_playback_gain() {
 omambience_sound_names() {
   local directory file sound
   local -A seen=()
+  local -a keyed_sounds=(rain fire thunder waves cafe)
 
   for directory in "$omambience_user_audio_dir" "$omambience_bundled_audio_dir"; do
     [[ -d $directory ]] || continue
@@ -81,6 +82,14 @@ omambience_sound_names() {
       fi
     done
     shopt -u nullglob
+  done
+
+  ((${#seen[@]} > 0)) || return 0
+  for sound in "${keyed_sounds[@]}"; do
+    if [[ -n ${seen[$sound]+present} ]]; then
+      printf '%s\n' "$sound"
+      unset 'seen[$sound]'
+    fi
   done
 
   ((${#seen[@]} > 0)) || return 0

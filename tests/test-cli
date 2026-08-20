@@ -46,12 +46,9 @@ assert_json() {
 }
 
 assert_json '.available == 6 and .active == 0
-  and any(.sounds[]; .name == "cafe")
-  and any(.sounds[]; .name == "stream")
-  and any(.sounds[]; .name == "thunder")
-  and any(.sounds[]; .name == "waves")
+  and (.sounds | map(.name)) == ["rain", "fire", "thunder", "waves", "cafe", "stream"]
   and (has("class") | not)' \
-  "bundled sounds should be discovered without legacy Waybar fields"
+  "bundled sounds should follow keybind order without legacy Waybar fields"
 
 "$toggle" cafe
 cafe_pid="$(<"$XDG_STATE_HOME/omambience/cafe.pid")"
@@ -106,8 +103,9 @@ if "$toggle" missing >/dev/null 2>&1; then
 fi
 
 touch "$XDG_DATA_HOME/omambience/audio/wind.ogg"
-assert_json '.available == 7 and any(.sounds[]; .name == "wind")' \
-  "user sounds should be discovered"
+assert_json '.available == 7
+  and (.sounds | map(.name)) == ["rain", "fire", "thunder", "waves", "cafe", "stream", "wind"]' \
+  "user sounds should follow keyed sounds in alphabetical order"
 "$toggle" wind
 wind_pid="$(<"$XDG_STATE_HOME/omambience/wind.pid")"
 tr '\0' '\n' <"/proc/$wind_pid/cmdline" \

@@ -34,7 +34,7 @@ Panel {
     focusTarget: keyCatcher
     contentWidth: popup.fittedContentWidth(Style.space(360))
     contentHeight: popup.fittedContentHeight(
-      hero.implicitHeight + headerSeparator.implicitHeight
+      panelHeader.implicitHeight + headerSeparator.implicitHeight
         + soundsColumn.implicitHeight + Style.space(24),
       Style.space(640))
 
@@ -49,32 +49,23 @@ Panel {
         anchors.fill: parent
         spacing: Style.space(12)
 
-        PanelHero {
-          id: hero
-          readonly property var ambienceHost: root.hostWidget
-          title: "Omambience"
-          foreground: root.foreground
-          fontFamily: root.fontFamily
-          iconComponent: Component {
-            Text {
-              text: "♫"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.display
-            }
-          }
-          trailingControl: Component {
-            Button {
-              text: hero.ambienceHost && hero.ambienceHost.activeCount > 0
-                ? "Stop all"
-                : "Stopped"
-              bordered: true
-              focusable: true
-              enabled: !!hero.ambienceHost && hero.ambienceHost.activeCount > 0
-              foreground: hero.foreground
-              fontFamily: hero.fontFamily
-              onClicked: hero.ambienceHost.stopAllSounds()
-            }
+        Item {
+          id: panelHeader
+          width: parent.width
+          implicitHeight: stopAllButton.implicitHeight
+
+          Button {
+            id: stopAllButton
+            anchors.right: parent.right
+            text: root.hostWidget && root.hostWidget.activeCount > 0
+              ? "Stop all"
+              : "Stopped"
+            bordered: true
+            focusable: true
+            enabled: !!root.hostWidget && root.hostWidget.activeCount > 0
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            onClicked: root.hostWidget.stopAllSounds()
           }
         }
 
@@ -85,7 +76,7 @@ Panel {
 
         Flickable {
           width: parent.width
-          height: Math.max(0, panelLayout.height - hero.implicitHeight
+          height: Math.max(0, panelLayout.height - panelHeader.implicitHeight
             - headerSeparator.implicitHeight - panelLayout.spacing * 2)
           contentWidth: width
           contentHeight: soundsColumn.implicitHeight

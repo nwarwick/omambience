@@ -1,58 +1,57 @@
-#!/bin/bash
-# Toggle one ambient sound on or off.
-#   omambience-toggle rain
-# If the sound is playing, kills its mpv. Otherwise starts a new looped mpv
-# instance. Multiple sounds can play at once — that's the mixing model; mixing
-# itself happens at the PipeWire layer.
+#!/usr/bin/env bash
 
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/omambience.sh
+source "$script_dir/../lib/omambience.sh"
+
 sound="${1:-}"
-if [[ -z "$sound" ]]; then
-  echo "Usage: $0 <sound>" >&2
-  exit 1
+if [[ -z $sound ]]; then
+  echo "Usage: ${0##*/} <sound>" >&2
+  exit 2
 fi
+omambience_require_sound "$sound"
 
-DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/omambience"
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omambience"
-AUDIO_FILE="$DATA_DIR/audio/$sound.ogg"
-SOCK="$STATE_DIR/$sound.sock"
-VOL_FILE="$STATE_DIR/$sound.volume"
-
-if [[ ! -f "$AUDIO_FILE" ]]; then
-  echo "No audio file at $AUDIO_FILE" >&2
+audio_file="$(omambience_audio_file "$sound")" || {
+  printf 'No audio file named %s.ogg in %s or %s\n' \
+    "$sound" "$omambience_user_audio_dir" "$omambience_bundled_audio_dir" >&2
   exit 1
-fi
+}
 
-mkdir -p "$STATE_DIR"
+omambience_prepare_state
+lock_file="$(omambience_lock_file "$sound")"
+exec 9>"$lock_file"
+flock 9
 
-# Pattern match against mpv's own argv. The leading `--` keeps us from
-# accidentally matching unrelated processes that happen to mention the socket
-# path (e.g. an interactive shell that just `cat`-ed the socket file).
-PATTERN="--input-ipc-server=$SOCK"
-
-# If already playing, stop it and we're done.
-# `--` keeps pgrep/pkill from interpreting the leading -- in the pattern as
-# their own option flag.
-if pgrep -f -- "$PATTERN" >/dev/null 2>&1; then
-  pkill -f -- "$PATTERN" 2>/dev/null || true
-  rm -f "$SOCK"
+if omambience_running_pid "$sound" >/dev/null; then
+  omambience_stop_sound "$sound"
   exit 0
 fi
 
-# Stale socket left from a crashed mpv would block a fresh bind.
-rm -f "$SOCK"
+socket="$(omambience_socket_file "$sound")"
+pid_file="$(omambience_pid_file "$sound")"
+volume="$(omambience_read_volume "$sound")"
+playback_gain="$(omambience_playback_gain "$sound" "$audio_file")"
+rm -f -- "$socket" "$pid_file"
 
-# Restore last-set volume; default 100 on first run.
-vol=100
-if [[ -f "$VOL_FILE" ]]; then
-  tmp=$(<"$VOL_FILE")
-  [[ "$tmp" =~ ^[0-9]+$ ]] && vol=$tmp
+setsid mpv \
+  --no-config \
+  --no-video \
+  --no-terminal \
+  --loop-file=inf \
+  --volume="$volume" \
+  --volume-gain="$playback_gain" \
+  --volume-gain-max=24 \
+  --input-ipc-server="$socket" \
+  -- "$audio_file" 9>&- >/dev/null 2>&1 &
+pid=$!
+printf '%s\n' "$pid" >"$pid_file"
+
+# Catch an immediate launch failure instead of leaving a convincing stale pid.
+sleep 0.05
+if ! omambience_pid_owns_socket "$pid" "$socket"; then
+  rm -f -- "$pid_file" "$socket"
+  printf 'Failed to start %s\n' "$sound" >&2
+  exit 1
 fi
-
-setsid -f mpv \
-  --no-config --no-video --no-terminal \
-  --loop \
-  --volume="$vol" \
-  --input-ipc-server="$SOCK" \
-  "$AUDIO_FILE" >/dev/null 2>&1

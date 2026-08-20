@@ -1,13 +1,26 @@
-#!/bin/bash
-# Stop every running omambience sound. Per-sound volumes are preserved.
+#!/usr/bin/env bash
 
 set -euo pipefail
 
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omambience"
-[[ -d "$STATE_DIR" ]] || exit 0
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/omambience.sh
+source "$script_dir/../lib/omambience.sh"
+
+[[ -d $omambience_state_dir ]] || exit 0
 
 shopt -s nullglob
-for sock in "$STATE_DIR"/*.sock; do
-  pkill -f -- "--input-ipc-server=$sock" 2>/dev/null || true
-  rm -f "$sock"
+pid_files=("$omambience_state_dir"/*.pid)
+shopt -u nullglob
+
+for pid_file in "${pid_files[@]}"; do
+  sound="${pid_file##*/}"
+  sound="${sound%.pid}"
+  omambience_validate_sound "$sound" || continue
+
+  lock_file="$(omambience_lock_file "$sound")"
+  exec {lock_fd}>"$lock_file"
+  flock "$lock_fd"
+  omambience_stop_sound "$sound"
+  flock -u "$lock_fd"
+  exec {lock_fd}>&-
 done

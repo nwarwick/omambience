@@ -1,138 +1,183 @@
-# omambience
+# Omambience
 
-A simple ambient noise mixer for [Omarchy](https://omarchy.org) / Hyprland
-setups. Toggle rain, fire, thunder, waves, and cafe loops with a keybind, mix
-them however you like, see what's playing in Waybar.
+Omambience is an ambient-noise mixer built for **Omarchy Quattro**. It is a
+native Omarchy shell bar widget backed by small Bash commands and one looping
+`mpv` process per active sound.
 
-- One key per sound — toggle on/off (`SUPER+ALT+1` through `SUPER+ALT+5`)
-- One key to stop everything (`SUPER+ALT+0`)
-- Mix freely — multiple sounds play at once, each with its own volume
-- Per-sound volumes persist between toggles
-- Waybar module that hides itself when nothing is playing
+- Toggle individual sounds and mix as many as you like.
+- Keep a separate, persistent volume for every sound.
+- See the active count in the bar and control each sound from the mixer panel.
+- Stop the whole mix with one click.
+- Control everything from Quattro's Lua keybindings through shell IPC.
 
-Built on `mpv` — one detached instance per sound, mixed by PipeWire.
-
-## Requirements
-
-- `mpv` (audio engine; one instance per active sound)
-- `socat` (talks to mpv's IPC socket for live volume changes)
-- `waybar`
-- Hyprland
-
-On Arch:
-
-```sh
-pacman -S mpv socat waybar
-```
+Omambience targets Omarchy 4.x only. Waybar and pre-Quattro Hyprland config
+are intentionally unsupported.
 
 ## Install
+
+Use Quattro's plugin manager:
+
+```sh
+omarchy plugin add https://github.com/nwarwick/omambience.git --enable
+```
+
+The widget is placed in the right bar section by default. Drag it elsewhere or
+use `omarchy bar move nwarwick.omambience`.
+
+Quattro includes Omambience's runtime dependencies (`mpv`, `socat`, and `jq`).
+On a customized installation, clone the repository and run the installer to
+ask Omarchy's package helper for anything missing before adding the plugin:
 
 ```sh
 git clone https://github.com/nwarwick/omambience.git
 cd omambience
-./install.sh
+./install-omarchy
 ```
 
-The installer will:
+The plugin manager deliberately installs no hooks and never asks for sudo.
+Review third-party plugin code before enabling it.
 
-- Drop `omambience-toggle`, `omambience-volume`, `omambience-stop-all`, and
-  `omambience-status` into `~/.local/bin/`
-- Copy audio files to `~/.local/share/omambience/audio/` (only if that dir is
-  empty — won't clobber your customizations)
-- Write `~/.config/hypr/omambience.conf` with default keybindings (only if you
-  don't already have one) and tell you the `source = ...` line to add to
-  `hyprland.conf`
-- Print the Waybar JSONC + CSS snippets you need to paste by hand
+## Bar widget
+
+The widget always shows a music note. It is dimmed while idle and highlighted
+while playing. With several active sounds it includes the count, such as
+`♫ 3`.
+
+Left-click the widget to open the native Omarchy mixer panel. Each discovered
+sound has an on/off toggle and a `0..100` volume slider, and the panel includes
+a stop-all button. Right-click the bar widget for the quick stop-all action.
+Set `alwaysShow` to `false` in the bar widget settings if you want it hidden
+while idle.
+
+## Optional keybindings
+
+Copy [`snippets/hypr-omambience.lua`](snippets/hypr-omambience.lua) into
+`~/.config/hypr/bindings.lua`, then apply and verify it:
+
+```sh
+hyprctl reload
+hyprctl configerrors
+```
+
+| Keys | Action |
+|---|---|
+| `SUPER+ALT+1..5` | Toggle rain, fire, thunder, waves, or cafe |
+| `SUPER+ALT+0` | Stop all sounds |
+| `SUPER+CTRL+1..5` | Raise that sound by 5 |
+| `SUPER+CTRL+SHIFT+1..5` | Lower that sound by 5 |
+
+The toggle bindings replace Quattro's default `SUPER+ALT+1..5` group-window
+selection bindings. If you use window groups, choose different keys instead
+of copying the snippet unchanged.
+
+The bindings call the widget's `nwarwick.omambience` IPC target, so they do not
+depend on scripts being copied into `~/.local/bin`.
+
+### Migrating an old install
+
+Before enabling the Quattro plugin, stop any pre-Quattro players with the old
+`~/.local/bin/omambience-stop-all` command. Replace old Omambience entries in
+`~/.config/hypr/bindings.lua` with the Lua snippet above; otherwise both the
+old direct commands and the new IPC commands may be bound.
+
+After confirming the plugin works, the old `~/.local/bin/omambience-*` files
+and `~/.config/hypr/omambience.conf` are unused and can be removed. Saved
+volumes and custom audio already live in the user data locations read by the
+new plugin, so they can stay.
 
 ## Audio files
 
-The repository ships with two seamless OGG loops in `audio/` (`rain.ogg` and
-`fire.ogg`). These are **licensed separately from the code** — see
-[`CREDITS.md`](CREDITS.md) for sources and terms. Notably, `fire.ogg` is
-CC BY-NC 3.0, so commercial use of the bundled fire loop is not permitted;
-swap it for a CC0 alternative if you need commercial-friendly audio.
+The repository includes rain, fire, thunder, waves, cafe, and stream loops.
+They are licensed separately from the code; see [`CREDITS.md`](CREDITS.md).
+In particular, the bundled fire and waves loops are non-commercial.
 
-To swap in your own files (or add `thunder.ogg`, `waves.ogg`, `cafe.ogg`),
-drop OGG loops named after the sound into `~/.local/share/omambience/audio/`.
-See `audio/README.md` for sourcing recommendations.
+Add or replace sounds without editing the installed plugin:
 
-## Keybindings
-
-| Keys                    | Action                              |
-|-------------------------|-------------------------------------|
-| `SUPER+ALT+1..5`        | Toggle rain/fire/thunder/waves/cafe |
-| `SUPER+ALT+0`           | Stop all sounds                     |
-| `SUPER+CTRL+1..5`       | Raise that sound's volume by 5      |
-| `SUPER+CTRL+SHIFT+1..5` | Lower that sound's volume by 5      |
-
-Volume binds use `binde` so they auto-repeat while held — hold to ramp.
-The `SUPER+CTRL` combos are deliberately chosen to dodge Omarchy's default
-`SUPER+SHIFT+N` and `SUPER+SHIFT+ALT+N` binds, which move windows to
-workspace N.
-
-The Waybar module is always visible (a single `♫` icon, dimmed when nothing
-is playing). When two or more sounds are active, the count is appended
-(e.g. `♫ 3`). Hover for the full readout — every available sound, its
-on/off state (`●` / `○`), a 10-cell volume bar, and the percent.
-
-| Mouse      | Action          |
-|------------|-----------------|
-| Left click | Stop all sounds |
-
-## Adjusting volume
-
-Per-sound volume is controlled from the CLI:
-
-```sh
-omambience-volume rain 60      # set rain to 60
-omambience-volume fire +10     # raise fire by 10
-omambience-volume cafe -5      # lower cafe by 5
+```text
+${XDG_DATA_HOME:-~/.local/share}/omambience/audio/<sound>.ogg
 ```
 
-Volume is clamped to `[0, 130]`. Values above 100 use mpv's soft amplification;
-go easy. The new value is applied live to the running sound (if any) and
-persisted, so the next time you toggle the sound on it starts at this level.
-The current per-sound levels are visible at a glance in the Waybar tooltip.
+User files take precedence over bundled files with the same name. Valid sound
+names contain letters, numbers, dots, underscores, or hyphens and may not
+contain `..`. The widget discovers valid `.ogg` files automatically.
 
-## Adding or renaming sounds
+The bundled `rain`, `fire`, `thunder`, `waves`, and `cafe` hotkeys work
+immediately. `stream` is available from the mixer panel without a default
+hotkey. See
+[`audio/README.md`](audio/README.md) for sourcing and encoding guidance.
 
-The five default sound names are wired into the Hyprland snippet and the
-audio filenames the installer copies, but the scripts themselves are
-sound-agnostic — they operate on whatever name you pass. To add a sixth sound:
+Bundled loops are gain-calibrated during playback to approximately `-30 LUFS`,
+so equal slider values have comparable perceived loudness. User audio is
+played at its native level because the plugin cannot know its loudness in
+advance.
 
-1. Drop `<name>.ogg` into `~/.local/share/omambience/audio/`
-2. Add a keybinding to `~/.config/hypr/omambience.conf`:
-   `bindd = SUPER ALT, 6, Toggle <name>, exec, $HOME/.local/bin/omambience-toggle <name>`
-3. Reload Hyprland: `hyprctl reload`
+## Commands and IPC
 
-The Waybar module enumerates all currently-playing sounds automatically, so it
-picks up new sounds the moment you first toggle them.
+The installed plugin keeps its commands under:
+
+```text
+~/.config/omarchy/plugins/nwarwick.omambience/bin/
+```
+
+They can be run directly, but Quattro integrations should use shell IPC:
+
+```sh
+omarchy-shell nwarwick.omambience toggle rain
+omarchy-shell nwarwick.omambience volume rain +5
+omarchy-shell nwarwick.omambience volume rain 60
+omarchy-shell nwarwick.omambience stopAll
+omarchy-shell nwarwick.omambience status
+```
+
+Volumes are clamped to `0..100`.
 
 ## How it works
 
-Each sound runs as a detached `mpv` instance with `--loop --no-config
---input-ipc-server=$XDG_STATE_HOME/omambience/<sound>.sock`. The socket is the
-source of truth for "is this sound playing?" — `omambience-toggle` checks for
-a running mpv bound to that socket. PipeWire combines the streams; that's the
-mixing.
+Each active sound runs in its own detached `mpv` session. Omambience records
+the process id and uses an exact IPC-socket argument check before treating that
+process as its own. Per-sound locks serialize rapid toggle and repeating-volume
+commands. PipeWire mixes the resulting streams.
 
-Volume changes are written to mpv via the IPC socket using `socat`, so they
-take effect live without restarting the sound. Per-sound volumes are persisted
-to `~/.local/state/omambience/<sound>.volume` and re-applied on the next toggle.
+| Data | Location |
+|---|---|
+| User audio | `${XDG_DATA_HOME:-~/.local/share}/omambience/audio/` |
+| PIDs, sockets, locks, volumes | `${XDG_STATE_HOME:-~/.local/state}/omambience/` |
+| Plugin checkout | `~/.config/omarchy/plugins/nwarwick.omambience/` |
 
 ## Uninstall
 
+From a repository checkout:
+
 ```sh
-./uninstall.sh
+./uninstall-omarchy
 ```
 
-Stops any running sounds, removes the scripts, removes the Hyprland snippet.
-Leaves audio files in `~/.local/share/omambience/`, persisted volumes in
-`~/.local/state/omambience/`, and Waybar edits in place — those may have been
-customized.
+Or manually:
+
+```sh
+omarchy-shell nwarwick.omambience stopAll
+omarchy plugin remove nwarwick.omambience
+```
+
+Removal leaves custom audio and saved volumes in place. Delete the two data
+directories above if you also want to remove that user-owned state. Remove the
+Omambience block from `~/.config/hypr/bindings.lua` if you installed the
+optional hotkeys.
+
+## Development
+
+```sh
+./tests/test
+omarchy plugin validate .
+```
+
+To install from a local committed checkout rather than its Git remote:
+
+```sh
+OMAMBIENCE_PLUGIN_SOURCE="$PWD" ./install-omarchy
+```
 
 ## License
 
-Code: MIT (see [`LICENSE`](LICENSE)).
-
-Bundled audio files: separately licensed, see [`CREDITS.md`](CREDITS.md).
+Code: MIT (see [`LICENSE`](LICENSE)). Bundled audio files retain their upstream
+licenses; see [`CREDITS.md`](CREDITS.md).

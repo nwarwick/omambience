@@ -1,6 +1,7 @@
 # Audio files
 
-omambience expects five OGG loops in this directory:
+Omambience discovers OGG loops bundled here and user-owned overrides under
+`${XDG_DATA_HOME:-~/.local/share}/omambience/audio/`:
 
 | Filename       | Notes                                                       |
 |----------------|-------------------------------------------------------------|
@@ -9,19 +10,24 @@ omambience expects five OGG loops in this directory:
 | `thunder.ogg`  | Distant rolling thunder. Avoid sharp peaks at the loop end. |
 | `waves.ogg`    | Beach or ocean waves.                                       |
 | `cafe.ogg`     | Coffee-shop ambience (chatter, clatter).                    |
+| `stream.ogg`   | Flowing woodland stream.                                    |
 
 The files **must be valid OGG Vorbis** and seamlessly loopable — mpv loops by
 restarting from the top, so any audible discontinuity at the boundary will be
 heard every cycle. 60–120 seconds is a comfortable length: short enough to
 keep the file small, long enough that the seam isn't obvious.
 
+User files take precedence over bundled files with the same name. Only
+filenames whose stem contains letters, numbers, dots, underscores, or hyphens
+are discovered, and a sound name may not contain `..`.
+
 ## Where to find loops
 
 These are good starting points for CC0 or permissively-licensed audio:
 
 - [freesound.org](https://freesound.org) — filter to license CC0 1.0
-- [pixabay.com/sound-effects](https://pixabay.com/sound-effects/) — Pixabay
-  Content License (free for commercial and personal use)
+- [pixabay.com/sound-effects](https://pixabay.com/sound-effects/) — review the
+  Pixabay Content License carefully; it prohibits standalone redistribution
 - [SoundBible](https://soundbible.com) — many CC-Sampling+ and PD samples
 
 Search terms that work well: `rain loop`, `fireplace ambience`,
@@ -44,6 +50,7 @@ start and end manually before exporting.
 
 ## Licenses
 
-Whatever you commit here will inherit the repository's MIT license unless you
-note otherwise. If you ship CC-BY tracks, add a `CREDITS.md` listing the
-authors and source URLs.
+Audio does not inherit the repository's MIT license. Before bundling a file,
+verify that its license permits redistribution as part of this plugin. Record
+its title, author, source URL, license, and any modifications in `CREDITS.md`.
+Prefer CC0 audio when possible.

@@ -3,9 +3,9 @@
   "id": "nwarwick.omambience",
   "name": "Omambience",
   "version": "2.0.0",
-  "author": "Nicholas Warwick",
+  "author": "Nick Warwick",
   "license": "MIT",
-  "description": "Mix looping ambient sounds from the Omarchy bar",
+  "description": "Curate pleasant ambient sounds from the top bar.",
   "kinds": [
     "bar-widget"
   ],
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Omambience",
-    "description": "Ambient sound mixer status and controls",
+    "description": "A delightfully simple ambient noise player.",
     "category": "Audio",
     "allowMultiple": false,
     "defaultSection": "right",

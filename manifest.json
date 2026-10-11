@@ -5,7 +5,7 @@
   "version": "2.0.0",
   "author": "Nick Warwick",
   "license": "MIT",
-  "description": "Curate pleasant ambient sounds from the top bar to help you focus or relax."
+  "description": "Curate pleasant ambient sounds from the top bar to help you focus or relax.",
   "kinds": [
     "bar-widget"
   ],
